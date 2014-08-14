@@ -1,7 +1,6 @@
 #include "Analysis/BoostedTopAnalysis/interface/Type22QCDEstimation.h"
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
-#include "AnalysisDataFormats/TopObjects/interface/CATopJetTagInfo.h"
-
+#include "DataFormats/JetReco/interface/CATopJetTagInfo.h"
 using namespace std;
 
 Type22QCDEstimation::Type22QCDEstimation( const edm::ParameterSet & iConfig,  TFileDirectory & iDir ) :
