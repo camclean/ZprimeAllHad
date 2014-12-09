@@ -1,0 +1,53 @@
+<use name="FWCore/Framework"/>
+<use name="FWCore/PluginManager"/>
+<use name="FWCore/ParameterSet"/>
+<use name="DataFormats/Common"/>
+<use name="DataFormats/TrackReco"/>
+<use name="DataFormats/PatCandidates"/>
+<use name="DataFormats/FWLite"/>
+<use name="DataFormats/RecoCandidate"/>
+<use name="fastjet"/>
+<use name="boost"/>
+<use name="rootgraphics"/>
+<use name="FWCore/FWLite"/>
+<flags EDM_PLUGIN="1"/>
+
+<flags USER_CXXFLAGS="-Wno-delete-non-virtual-dtor"/>
+<flags USER_CXXFLAGS="-Wno-error=unused-but-set-variable"/>
+<flags USER_CXXFLAGS="-Wno-error=unused-variable"/>
+<flags USER_CXXFLAGS="-Wno-error=reorder"/>
+<flags USER_CXXFLAGS="-Wno-error=maybe-uninitialized"/>
+
+<environment>
+  <bin   file="topTagEfficiency.cc"></bin>
+
+  <bin   file="topTagEfficiency_ZPrime_13TeV_noBtag.cc"></bin>
+  <bin   file="topTagEfficiency_ZPrime_13TeV_looseBtag.cc"></bin>
+  <bin   file="topTagEfficiency_ZPrime_13TeV_mediumBtag.cc"></bin>
+
+  <bin   file="topTagEfficiency_1800to2400_QCD_13TeV_noBtag.cc"></bin>
+  <bin   file="topTagEfficiency_QCD_13TeV_looseBtag.cc"></bin>
+  <bin   file="topTagEfficiency_QCD_13TeV_mediumBtag.cc"></bin>
+
+  <bin   file="topTagEfficiency_2400to3200_QCD_13TeV_noBtag.cc"></bin>
+
+  <bin   file="topTagEfficiency_QCD_FLAT_13TeV_noBtag.cc"></bin>
+  <bin   file="topTagEfficiency_QCD_FLAT_13TeV_looseBtag.cc"></bin>
+  <bin   file="topTagEfficiency_QCD_FLAT_13TeV_mediumBtag.cc"></bin>
+
+  <bin   file="topTagEfficiency_SMttbar_13TeV_noBtag.cc"></bin>
+  <bin   file="topTagEfficiency_SMttbar_13TeV_looseBtag.cc"></bin>
+  <bin   file="topTagEfficiency_SMttbar_13TeV_mediumBtag.cc"></bin>
+
+  <bin   file="topTagEfficiency_massWindowOptimize.cc"></bin>  
+  <bin   file="topTagEfficiency_massWindowOptimize_partTwo.cc"></bin>
+
+  <bin   file="topTagEfficiency_massWindowMinmassOptimize.cc"></bin>
+  <bin   file="topTagEfficiency_massWindowMinmassOptimize_partTwo.cc"></bin>
+
+  <bin   file="AK8jetsGroomedMassCompare.cc"></bin>
+</environment>
+
+<export>
+  <lib name="1"/>
+</export>
