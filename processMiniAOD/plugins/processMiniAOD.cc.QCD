@@ -34,6 +34,9 @@
 #include "DataFormats/Candidate/interface/Candidate.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/JetReco/interface/CATopJetTagInfo.h"
+
+#include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/GenRunInfoProduct.h"
 //#include "AnalysisDataFormats/TopObjects/interface/CATopJetTagInfo.h"
 
 #include <fastjet/JetDefinition.hh>
@@ -144,6 +147,7 @@ processMiniAOD::processMiniAOD(const edm::ParameterSet& iConfig):
   produces<double> ("AK8jet2trimmedMassEff");
   produces<double> ("mttgen");
   produces<double> ("mtttag");
+  produces<double> ("evWeight");
 
   produces<std::vector<reco::Candidate::PolarLorentzVector> > ("AK8jetP4");
   produces<std::vector<reco::Candidate::PolarLorentzVector> > ("genTopP4");
@@ -200,6 +204,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   Handle<edm::View<reco::Vertex> > h_pv;
   Handle<edm::View<pat::Jet> > h_topTag;
   Handle<edm::View<pat::Jet> > h_ca8Jet;
+  edm::Handle<GenEventInfoProduct > h_genEventInfo;
 
   iEvent.getByLabel( AK8jetSrc_, h_AK8jet );
   //iEvent.getByLabel( GenJetSrc_, h_gen );
@@ -207,6 +212,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.getByToken(pvSrc_,h_pv);
   iEvent.getByToken(topTagSrc_, h_topTag);
   iEvent.getByToken(ca8JetSrc_, h_ca8Jet);
+  iEvent.getByLabel("generator", h_genEventInfo);
 
   //cout <<"Handles created"<<endl;
 
@@ -252,6 +258,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   std::auto_ptr<double> AK8jet2trimmedMassEff ( new double() );
   std::auto_ptr<double> mttgen( new double() );
   std::auto_ptr<double> mtttag( new double() );
+  std::auto_ptr<double> evWeight( new double() );
 
   std::auto_ptr<p4_vector> AK8jetP4( new p4_vector() );
   std::auto_ptr<p4_vector> genTopP4( new p4_vector() );
@@ -281,6 +288,12 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   Nsubjettiness Nsub4(4, Njettiness::AxesMode::kt_axes, 1.0, 0.8);
 
   //cout <<"Nsubi intitialized"<<endl;
+
+
+  //event weights
+  if (h_genEventInfo.isValid()){
+    *evWeight = h_genEventInfo->weight();
+  }
 
   std::vector<const reco::GenParticle *> genTop;
 
@@ -326,6 +339,8 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   *jet1tagEff = -1;
   *jet2tagEff = -1;
 
+  int ttcounter = 0;
+
   //initializing jets for mtttag
   std::vector<const pat::Jet *> topTag1,topTag2;
 
@@ -367,85 +382,66 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
     }
 
     //top tagging efficiency
-    if (genTop.size() >= 2) {
-      int double_countEff = 0;
-      double deltaPhiSqEff_0 = (genTop[0]->phi() - corrJet.phi())*(genTop[0]->phi() - corrJet.phi());
-      double deltaEtaSqEff_0 = (genTop[0]->eta() - corrJet.eta())*(genTop[0]->eta() - corrJet.eta());
-      double deltaReff_0 = sqrt(deltaPhiSqEff_0 + deltaEtaSqEff_0);
+    ttcounter += 1;
+    
+    //cout << "Top tag counter: "<<ttcounter<<endl;
 
-      cout <<"deltaReff_0 = "<<deltaReff_0<<endl;
-
-      if (deltaReff_0 < 0.1){
-	jet1P4->push_back(corrJet);
-	topTag1.push_back( &(*ijet) );
-	*jet1ptEff = corrJet.pt();
-       	*jet1NsubjEff = nSubjets;
-	*jet1deltaReff = deltaReff_0;
-	*jet1minmassEff = minMassEff;
-	*jet1topMassEff = topMassEff;
-	*jet1BDiscEff = ijet->bDiscriminator("combinedSecondaryVertexBJetTags");
-	*jet1MaxSubjBDiscEff = maxSubjetBDisc;
-	*jet1tagEff = 0;
-	//cout <<h_pv->size()<<endl;
+    if (ttcounter == 1){
+      jet1P4->push_back(corrJet);
+      topTag1.push_back( &(*ijet) );
+      *jet1ptEff = corrJet.pt();
+      *jet1NsubjEff = nSubjets;
+      *jet1minmassEff = minMassEff;
+      *jet1topMassEff = topMassEff;
+      *jet1BDiscEff = ijet->bDiscriminator("combinedSecondaryVertexBJetTags");
+      *jet1MaxSubjBDiscEff = maxSubjetBDisc;
+      *jet1tagEff = 0;
+      //cout <<h_pv->size()<<endl;
 	
-	for (int i = 0; i < nSubjets; i++ ){
-	  const pat::Jet* this_subjet1 = dynamic_cast<const pat::Jet*>((ijet->daughter(i)));
+      for (int i = 0; i < nSubjets; i++ ){
+	const pat::Jet* this_subjet1 = dynamic_cast<const pat::Jet*>((ijet->daughter(i)));
 
-	  reco::Candidate::LorentzVector uncorrSubjet1 = this_subjet1->correctedP4(0);
-	  reco::Candidate::PolarLorentzVector corrSubjet1 (uncorrSubjet1.pt(), uncorrSubjet1.eta(), uncorrSubjet1.phi(), uncorrSubjet1.mass());
-
-	  double bDisc1 = this_subjet1->bDiscriminator("combinedSecondaryVertexBJetTags");
-	  
-	  jet1SubjetP4->push_back(corrSubjet1);
-	  jet1SubjetBDiscEff->push_back(bDisc1);
-	 }
-
-	if ((topMassEff > tagParamsEff[0]) && (topMassEff < tagParamsEff[1]) && (nSubjets >= tagParamsEff[2]) && (minMassEff > tagParamsEff[3])){
-	  *jet1tagEff = 1;
-	}
+	reco::Candidate::LorentzVector uncorrSubjet1 = this_subjet1->correctedP4(0);
+	reco::Candidate::PolarLorentzVector corrSubjet1 (uncorrSubjet1.pt(), uncorrSubjet1.eta(), uncorrSubjet1.phi(), uncorrSubjet1.mass());
 	
-	double_countEff += 1;
+	double bDisc1 = this_subjet1->bDiscriminator("combinedSecondaryVertexBJetTags");
+	
+	jet1SubjetP4->push_back(corrSubjet1);
+	jet1SubjetBDiscEff->push_back(bDisc1);
+      }
+
+      if ((topMassEff > tagParamsEff[0]) && (topMassEff < tagParamsEff[1]) && (nSubjets >= tagParamsEff[2]) && (minMassEff > tagParamsEff[3])){
+	*jet1tagEff = 1;
+      }
+    }
+    
+    if (ttcounter == 2){
+      jet2P4->push_back(corrJet);
+      topTag2.push_back( &(*ijet) );
+      //corrJet2 = corrJet;
+      *jet2ptEff = corrJet.pt();
+      *jet2NsubjEff = nSubjets;
+      *jet2minmassEff = minMassEff;
+      *jet2topMassEff = topMassEff;
+      *jet2BDiscEff = ijet->bDiscriminator("combinedSecondaryVertexBJetTags");
+      *jet2MaxSubjBDiscEff = maxSubjetBDisc;
+      *jet2tagEff = 0;
+      //cout <<h_pv->size()<<endl;
+      
+      for (int i = 0; i < nSubjets; i++ ){
+	const pat::Jet* this_subjet2 = dynamic_cast<const pat::Jet*>((ijet->daughter(i)));
+	
+	reco::Candidate::LorentzVector uncorrSubjet2 = this_subjet2->correctedP4(0);
+	reco::Candidate::PolarLorentzVector corrSubjet2 (uncorrSubjet2.pt(), uncorrSubjet2.eta(), uncorrSubjet2.phi(), uncorrSubjet2.mass());
+
+	double bDisc2 = this_subjet2->bDiscriminator("combinedSecondaryVertexBJetTags");
+	
+	jet2SubjetP4->push_back(corrSubjet2);
+	jet2SubjetBDiscEff->push_back(bDisc2);
       }
       
-      double deltaPhiSqEff_1 = (genTop[1]->phi() - corrJet.phi())*(genTop[1]->phi() - corrJet.phi());
-      double deltaEtaSqEff_1 = (genTop[1]->eta() - corrJet.eta())*(genTop[1]->eta() - corrJet.eta());
-      double deltaReff_1 = sqrt(deltaPhiSqEff_1 + deltaEtaSqEff_1);
-         
-      if (deltaReff_1 < 0.1){
-	jet2P4->push_back(corrJet);
-	topTag2.push_back( &(*ijet) );
-        //corrJet2 = corrJet;
-	*jet2ptEff = corrJet.pt();
-	*jet2NsubjEff = nSubjets;
-	*jet2deltaReff = deltaReff_1;
-	*jet2minmassEff = minMassEff;
-	*jet2topMassEff = topMassEff;
-	*jet2BDiscEff = ijet->bDiscriminator("combinedSecondaryVertexBJetTags");
-        *jet2MaxSubjBDiscEff = maxSubjetBDisc;
-	*jet2tagEff = 0;
-	//cout <<h_pv->size()<<endl;
-	
-	for (int i = 0; i < nSubjets; i++ ){
-          const pat::Jet* this_subjet2 = dynamic_cast<const pat::Jet*>((ijet->daughter(i)));
-
-	  reco::Candidate::LorentzVector uncorrSubjet2 = this_subjet2->correctedP4(0);
-	  reco::Candidate::PolarLorentzVector corrSubjet2 (uncorrSubjet2.pt(), uncorrSubjet2.eta(), uncorrSubjet2.phi(), uncorrSubjet2.mass());
-
-          double bDisc2 = this_subjet2->bDiscriminator("combinedSecondaryVertexBJetTags");
-
-	  jet2SubjetP4->push_back(corrSubjet2);
-          jet2SubjetBDiscEff->push_back(bDisc2);
-	}
-
-	if ((topMassEff > tagParamsEff[0]) && (topMassEff < tagParamsEff[1]) && (nSubjets >= tagParamsEff[2]) && (minMassEff > tagParamsEff[3])){
-	  *jet2tagEff = 1;
-	}
-	
-	double_countEff += 1;
-        }
-      
-      if (double_countEff > 1){
-	cout <<"DOUBLE COUNTING!"<<endl;
+      if ((topMassEff > tagParamsEff[0]) && (topMassEff < tagParamsEff[1]) && (nSubjets >= tagParamsEff[2]) && (minMassEff > tagParamsEff[3])){
+	*jet2tagEff = 1;
       }
     }
   }
@@ -500,10 +496,10 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 
       if (deltaReff_1 < 0.1){
 
-        *AK8jet1MassEff = ijet->mass();
-        *AK8jet1filteredMassEff = filteredMass;
-        *AK8jet1prunedMassEff = prunedMass;
-        *AK8jet1trimmedMassEff = trimmedMass;
+	*AK8jet1MassEff = ijet->mass();
+	*AK8jet1filteredMassEff = filteredMass;
+	*AK8jet1prunedMassEff = prunedMass;
+	*AK8jet1trimmedMassEff = trimmedMass;
 	*AK8jet1tagEff |= 1;
 
 	//filtered mass tagging
@@ -534,8 +530,8 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 
       if (deltaReff_2 < 0.1){
 
-        *AK8jet2MassEff= ijet->mass();
-        *AK8jet2filteredMassEff = filteredMass;
+	*AK8jet2MassEff= ijet->mass();
+	*AK8jet2filteredMassEff = filteredMass;
         *AK8jet2prunedMassEff = prunedMass;
         *AK8jet2trimmedMassEff = trimmedMass;
         *AK8jet2tagEff |= 1;
@@ -557,37 +553,30 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
       }
     }
   }
-  
+
   //Nsubjettiness for-loop
-  if(h_ca8Jet.isValid()){
-    //cout<<"There are "<<h_ca8Jet->size()<<" CA8 jets."<<endl;
-    int k =  0;
+  for ( edm::View<pat::Jet>::const_iterator jetBegin = h_ca8Jet->begin(), jetEnd = h_ca8Jet->end(), ijet = jetBegin; ijet != jetEnd; ++ijet ) {
 
-    for ( edm::View<pat::Jet>::const_iterator jetBegin = h_ca8Jet->begin(), jetEnd = h_ca8Jet->end(), ijet = jetBegin; ijet != jetEnd; ++ijet ) {
-      k += 1;
-      std::vector<fastjet::PseudoJet> FJparticles;
-      
-      //cout<<"There are "<<ijet->numberOfDaughters()<<" daughters in CA8 jet number "<<k <<"."<<endl;
+    std::vector<fastjet::PseudoJet> FJparticles;
 
-      for (unsigned i = 0; i < ijet->numberOfDaughters() ; i++){
-	
-	const reco::Candidate* this_constituent = dynamic_cast<const reco::Candidate*>(ijet->daughter(i));
-	
-	FJparticles.push_back( fastjet::PseudoJet( this_constituent->px(),
-						   this_constituent->py(),
-						   this_constituent->pz(),
-						   this_constituent->energy() ) );
-      }
-      
-      fastjet::PseudoJet combJet = fastjet::join(FJparticles);
-   
-      tau1->push_back(Nsub1.result(combJet));
-      tau2->push_back(Nsub2.result(combJet));
-      tau3->push_back(Nsub3.result(combJet));
-      tau4->push_back(Nsub4.result(combJet));
+    for (unsigned i = 0; i < ijet->numberOfDaughters() ; i++){
+ 
+      const reco::Candidate* this_constituent = dynamic_cast<const reco::Candidate*>(ijet->daughter(i));
+
+      FJparticles.push_back( fastjet::PseudoJet( this_constituent->px(),
+                                                 this_constituent->py(),
+                                                 this_constituent->pz(),
+                                                 this_constituent->energy() ) );
     }
+    
+    fastjet::PseudoJet combJet = fastjet::join(FJparticles);
+   
+    tau1->push_back(Nsub1.result(combJet));
+    tau2->push_back(Nsub2.result(combJet));
+    tau3->push_back(Nsub3.result(combJet));
+    tau4->push_back(Nsub4.result(combJet));
   }
-  
+
   iEvent.put(jetPt,"jetPt");
   iEvent.put(jetEta,"jetEta");
   iEvent.put(jetPhi,"jetPhi");
@@ -630,6 +619,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.put(AK8jet2trimmedMassEff ,"AK8jet2trimmedMassEff");
   iEvent.put(mttgen, "mttgen");
   iEvent.put(mtttag, "mtttag");
+  iEvent.put(evWeight, "evWeight");
 
   iEvent.put(AK8jetP4,"AK8jetP4");
   iEvent.put(genTopP4,"genTopP4");
