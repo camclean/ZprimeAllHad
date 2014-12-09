@@ -22,7 +22,7 @@ mergedvertices        = 'unpackedTracksAndVertices'
 mergedvertices2       = 'secondary'
 primaryvertices       = 'offlineSlimmedPrimaryVertices'
 
-print 'Test 1'
+#print 'Test 1'
 
 ###############################################################################
 #INPUT
@@ -34,13 +34,16 @@ process.source = cms.Source("PoolSource",
        #'dcap:///pnfs/cms/WAX/11/store/user/lpctlbsm/weizou/WprimeToTBbar_M-2000_TuneZ2_7TeV-pythia6/ttbsm_v8_Summer11-PU_S4_-START42_V11-v1/2bcf344afee8f9cb5489a05cc32c05cf/ttbsm_42x_mc_1_1_J1v.root'
         #    '/store/results/B2G/TT_8TeV-mcatnlo/StoreResults-Summer12_DR53X-PU_S10_START53_V7A-v1_TLBSM_53x_v2-c04f3b4fa74c8266c913b71e0c74901d/TT_8TeV-mcatnlo/USER/StoreResults-Summer12_DR53X-PU_S10_START53_V7A-v1_TLBSM_53x_v2-c04f3b4fa74c8266c913b71e0c74901d/0000/FEBBE69C-1942-E211-9959-002354EF3BE2.root',
         #'/store/user/lpctlbsm/jdolen/TT_CT10_TuneZ2star_8TeV-powheg-tauola/Summer12_DR53X-PU_S10_START53_V7A-v2_TLBSM_53x_v3_bugfix_v1/99bd99199697666ff01397dad5652e9e/tlbsm_53x_v3_mc_1912_2_rsE.root'
-        'file:/uscms_data/d3/camclean/CSA14/topTaggingEfficiency/CMSSW_7_0_6_patch1/src/Analysis/processMiniAOD/test/RSGluonToTT_M-4000_Tune4C_13TeV-pythia8_PU_S14_PAT.root'
+        #'file:/eos/uscms/store/user/chmclean/TT_Tune4C_13TeV-pythia8-tauola/miniAOD_TT_09_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_52_1_Xsd.root'
+        #'/store/user/chmclean/TT_Tune4C_13TeV-pythia8-tauola/miniAOD_TT_09_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_52_1_Xsd.root'
+        #'/store/user/chmclean/QCD_Pt-1800to2400_Tune4C_13TeV_pythia8/miniAOD_QCD_Pt-1800to2400_09_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_100_1_Es8.root'
+        'file:/eos/uscms/store/user/camclean/QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8/miniAOD_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_10_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_1209_1_2eT.root'
         )
                             )
 ##############################################################################                                                                                                                              
 #OUTPUT                                                                                                                                                                                                     
 process.out = cms.OutputModule("PoolOutputModule",
-                               fileName = cms.untracked.string("miniAOD_RSGluonToTT_4TeV_Aug13.root"),
+                               fileName = cms.untracked.string("miniAOD.root"),
                                SelectEvents   = cms.untracked.PSet( SelectEvents = cms.vstring('p') ),
                                outputCommands = cms.untracked.vstring('drop *',
                                                                       'keep *_*miniAOD*_*_*'
@@ -69,6 +72,7 @@ from RecoJets.JetProducers.AnomalousCellParameters_cfi import *
 from RecoJets.JetProducers.GenJetParameters_cfi import *
 from RecoJets.JetProducers.caTopTaggers_cff import *
 from PhysicsTools.PatAlgos import *
+
 
 ############################################################################## 
 #GENJETS
@@ -147,7 +151,7 @@ process.CATopTagInfos = cms.EDProducer("CATopJetTagger",
 ##############################################################################
 #PAT JETS
 from PhysicsTools.PatAlgos.tools.jetTools import *
-#from PhysicsTools.PatAlgos.mcMatchLayer0.jetFlavourId_cff import patJetFlavourAssociation
+from PhysicsTools.PatAlgos.mcMatchLayer0.jetFlavourId_cff import patJetFlavourAssociation
 #from RecoParticleFlow.PFProducer import *
 
 #import RecoEgamma.EgammaElectronProducers.gedGsfElectronFinalizer_cfi
@@ -169,7 +173,7 @@ process.impactParameterTagInfos.primaryVertex = cms.InputTag(vertices)
 process.inclusiveSecondaryVertexFinderTagInfos.extSVCollection = cms.InputTag(mergedvertices,mergedvertices2,"")
 process.combinedSecondaryVertex.trackMultiplicityMin = 1
 
-print 'Test 2'
+#print 'Test 2'
 
 #patJetsCA8PF
 addJetCollection(
@@ -182,6 +186,7 @@ addJetCollection(
     trackSource = cms.InputTag(tracks),
     pvSource = cms.InputTag(vertices),
     btagDiscriminators = ['combinedSecondaryVertexBJetTags'],
+    getJetMCFlavour = False
     )
 process.patJetPartonMatchCA8PF.matched=importantgenparticles
 process.patJetCorrFactorsCA8PF.primaryVertices = primaryvertices
@@ -233,7 +238,7 @@ process.patJetCorrFactorsCMSTopTagCHSSubjets.primaryVertices = primaryvertices
 process.patJetGenJetMatchCMSTopTagCHSSubjets.matched = 'ca8GenJets'#slimmedGenJets'
 process.patJetPartonMatchCMSTopTagCHSSubjets.matched = importantgenparticles
 
-print 'Test 3'
+#print 'Test 3'
 
 process.patJetsCMSTopTagCHSPacked = cms.EDProducer("BoostedJetMerger",
     jetSrc=cms.InputTag("patJetsCMSTopTagCHS" ),
@@ -256,7 +261,7 @@ process.miniAOD = cms.EDFilter('processMiniAOD',
                                     tagName = cms.string('CATop')
                                     )
                                )
-
+#print 'Test 4'
 ##############################################################################  
 #PATHS
 
@@ -296,6 +301,9 @@ process.out = cms.OutputModule("PoolOutputModule",
 
 process.outpath = cms.EndPath(process.out)
 '''
+#print 'Test 5'
 process.outpath = cms.EndPath(process.out)
+
+#print 'Test 6'
 #process.options   = cms.untracked.PSet( wantSummary = cms.untracked.bool(True) )
 process.out.dropMetaData = cms.untracked.string("DROPPED")
