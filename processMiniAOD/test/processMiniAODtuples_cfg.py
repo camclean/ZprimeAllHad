@@ -37,19 +37,10 @@ process.source = cms.Source("PoolSource",
         #'file:/eos/uscms/store/user/chmclean/TT_Tune4C_13TeV-pythia8-tauola/miniAOD_TT_09_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_52_1_Xsd.root'
         #'/store/user/chmclean/TT_Tune4C_13TeV-pythia8-tauola/miniAOD_TT_09_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_52_1_Xsd.root'
         #'/store/user/chmclean/QCD_Pt-1800to2400_Tune4C_13TeV_pythia8/miniAOD_QCD_Pt-1800to2400_09_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_100_1_Es8.root'
-        'file:/eos/uscms/store/user/camclean/QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8/miniAOD_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_10_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_1209_1_2eT.root'
+        #'file:/eos/uscms/store/user/camclean/QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8/miniAOD_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_10_01_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_1209_1_2eT.root'
+        'file:/eos/uscms/store/user/camclean/ZPrimeToTTJets_M4000GeV_W400GeV_Tune4C_13TeV-madgraph-tauola/miniAOD_ZPrimeToTTJets_M4000GeV_W400GeV_11_21_2014/92bfc1aa0ef8c674e0edabb945b19298/miniAOD-prod_PAT_48_1_6Km.root'
         )
                             )
-##############################################################################                                                                                                                              
-#OUTPUT                                                                                                                                                                                                     
-process.out = cms.OutputModule("PoolOutputModule",
-                               fileName = cms.untracked.string("miniAOD.root"),
-                               SelectEvents   = cms.untracked.PSet( SelectEvents = cms.vstring('p') ),
-                               outputCommands = cms.untracked.vstring('drop *',
-                                                                      'keep *_*miniAOD*_*_*'
-                                                                      )
-                               )
-
 ###############################################################################
 #SETUP
 
@@ -96,6 +87,8 @@ process.ca8GenJetsPruned = ca4GenJets.clone(
 
 ##############################################################################
 # RECO
+
+#process.particleFlowPtrs.src = pfcandidates
 
 process.chs = cms.EDFilter("CandPtrSelector",
                            src = cms.InputTag("packedPFCandidates"),
@@ -148,6 +141,47 @@ process.CATopTagInfos = cms.EDProducer("CATopJetTagger",
                                     MinMassMax = cms.double(200.0),
                                     verbose = cms.bool(False)
                                     )
+
+process.cmsTopTagCHSFiltered = cms.EDProducer(
+    "CATopJetProducer",
+    PFJetParameters.clone( src = cms.InputTag(chsstring),
+                           doAreaFastjet = cms.bool(True),
+                           doRhoFastjet = cms.bool(False),
+                           jetPtMin = cms.double(100.0)
+                           ),
+    AnomalousCellParameters,
+    CATopJetParameters.clone( jetCollInstanceName = cms.string("SubJetsFiltered"),
+                              verbose = cms.bool(False),
+                              algorithm = cms.int32(1), # 0 = KT, 1 = CA, 2 = anti-KT
+                              tagAlgo = cms.int32(1), #0=legacy top
+                              useAdjacency = cms.int32(2), # modified adjacency
+                              centralEtaCut = cms.double(2.5), # eta for defining "central" jets
+                              sumEtBins = cms.vdouble(0,1600,2600), # sumEt bins over which cuts vary. vector={bin 0 lower bound, bin 1 lower bound, ...}
+                              rBins = cms.vdouble(0.8,0.8,0.8), # Jet distance paramter R. R values depend on sumEt bins.
+                              ptFracBins = cms.vdouble(0.05,0.05,0.05), # minimum fraction of central jet pt for subjets (deltap)
+                              deltarBins = cms.vdouble(0.19,0.19,0.19), # Applicable only if useAdjacency=1. deltar adjacency values for each sumEtBin
+                              nCellBins = cms.vdouble(1.9,1.9,1.9),
+                            ),
+    jetAlgorithm = cms.string("CambridgeAachen"),
+    rParam = cms.double(0.8),
+    writeCompound = cms.bool(True),
+    useFiltering = cms.bool(True),
+    nFilt = cms.int32(3),
+    rFilt = cms.double(0.3)
+    )
+
+process.CATopTagInfosFiltered = cms.EDProducer("CATopJetTagger",
+                                    src = cms.InputTag("cmsTopTagCHSFiltered"),
+                                    TopMass = cms.double(171),
+                                    TopMassMin = cms.double(0.),
+                                    TopMassMax = cms.double(250.),
+                                    WMass = cms.double(80.4),
+                                    WMassMin = cms.double(0.0),
+                                    WMassMax = cms.double(200.0),
+                                    MinMassMin = cms.double(0.0),
+                                    MinMassMax = cms.double(200.0),
+                                    verbose = cms.bool(False)
+                                    )
 ##############################################################################
 #PAT JETS
 from PhysicsTools.PatAlgos.tools.jetTools import *
@@ -172,8 +206,6 @@ process.ak5JetTracksAssociatorAtVertexPF.tracks = cms.InputTag(tracks)
 process.impactParameterTagInfos.primaryVertex = cms.InputTag(vertices)
 process.inclusiveSecondaryVertexFinderTagInfos.extSVCollection = cms.InputTag(mergedvertices,mergedvertices2,"")
 process.combinedSecondaryVertex.trackMultiplicityMin = 1
-
-#print 'Test 2'
 
 #patJetsCA8PF
 addJetCollection(
@@ -238,11 +270,59 @@ process.patJetCorrFactorsCMSTopTagCHSSubjets.primaryVertices = primaryvertices
 process.patJetGenJetMatchCMSTopTagCHSSubjets.matched = 'ca8GenJets'#slimmedGenJets'
 process.patJetPartonMatchCMSTopTagCHSSubjets.matched = importantgenparticles
 
-#print 'Test 3'
-
 process.patJetsCMSTopTagCHSPacked = cms.EDProducer("BoostedJetMerger",
     jetSrc=cms.InputTag("patJetsCMSTopTagCHS" ),
     subjetSrc=cms.InputTag("patJetsCMSTopTagCHSSubjets")
+      )
+
+# patJetsCMSTopTagCHSFiltered
+addJetCollection(
+    process,
+    labelName = 'CMSTopTagCHSFiltered',
+    jetSource = cms.InputTag('cmsTopTagCHSFiltered'),
+    jetCorrections = ('AK7PFchs', cms.vstring(['L1FastJet', 'L2Relative', 'L3Absolute']), 'None'),
+    trackSource = cms.InputTag(tracks),
+    pvSource = cms.InputTag(vertices),
+    btagDiscriminators = ['combinedSecondaryVertexBJetTags'],
+    #getJetMCFlavour = False,
+        # btagInfos = [
+        # 'CATopTagInfos'
+        #  ]   
+    )
+process.patJetCorrFactorsCMSTopTagCHSFiltered.primaryVertices = primaryvertices
+process.patJetGenJetMatchCMSTopTagCHSFiltered.matched = 'ca8GenJetsPruned'#'slimmedGenJets'
+process.patJetPartonMatchCMSTopTagCHSFiltered.matched = importantgenparticles
+process.jetTracksAssociatorAtVertexCMSTopTagCHSFiltered=process.ak5JetTracksAssociatorAtVertexPF.clone(jets = cms.InputTag('cmsTopTagCHSFiltered'), coneSize = 0.8)
+process.secondaryVertexTagInfosCMSTopTagCHSFiltered.trackSelection.jetDeltaRMax = cms.double(0.8) # default is 0.3                                                                                                 
+process.secondaryVertexTagInfosCMSTopTagCHSFiltered.vertexCuts.maxDeltaRToJetAxis = cms.double(0.8) # default is 0.5     
+process.combinedSecondaryVertexCMSTopTagCHSFiltered= process.combinedSecondaryVertex.clone()
+process.combinedSecondaryVertexCMSTopTagCHSFiltered.trackSelection.jetDeltaRMax = cms.double(0.8)
+process.combinedSecondaryVertexCMSTopTagCHSFiltered.trackPseudoSelection.jetDeltaRMax = cms.double(0.8)
+process.combinedSecondaryVertexBJetTagsCMSTopTagCHSFiltered.jetTagComputer = cms.string('combinedSecondaryVertexCMSTopTagCHSFiltered')
+process.patJetsCMSTopTagCHSFiltered.addTagInfos = True
+process.patJetsCMSTopTagCHSFiltered.tagInfoSources = cms.VInputTag(
+    cms.InputTag('CATopTagInfosFiltered')
+    )
+
+addJetCollection(
+    process,
+    labelName = 'CMSTopTagCHSSubjetsFiltered',
+    jetSource = cms.InputTag('cmsTopTagCHSFiltered','SubJetsFiltered'),
+    jetCorrections = ('AK7PFchs', cms.vstring(['L1FastJet', 'L2Relative', 'L3Absolute']), 'None'),
+    trackSource = cms.InputTag(tracks),
+    pvSource = cms.InputTag(vertices),
+    btagDiscriminators = ['combinedSecondaryVertexBJetTags'],
+    getJetMCFlavour = False,
+    )
+
+process.patJetPartonMatchCMSTopTagCHSSubjetsFiltered.matched=importantgenparticles
+process.patJetCorrFactorsCMSTopTagCHSSubjetsFiltered.primaryVertices = primaryvertices
+process.patJetGenJetMatchCMSTopTagCHSSubjetsFiltered.matched = 'ca8GenJets'#slimmedGenJets'
+process.patJetPartonMatchCMSTopTagCHSSubjetsFiltered.matched = importantgenparticles
+
+process.patJetsCMSTopTagCHSPackedFiltered = cms.EDProducer("BoostedJetMerger",
+    jetSrc=cms.InputTag("patJetsCMSTopTagCHSFiltered" ),
+    subjetSrc=cms.InputTag("patJetsCMSTopTagCHSSubjetsFiltered")
       )
 
 process.patMETs.addGenMET = False # There's no point in recalculating this, and we can't remake it since we don't have genParticles beyond |eta|=5 
@@ -256,12 +336,24 @@ process.miniAOD = cms.EDFilter('processMiniAOD',
                                pruned = cms.InputTag('prunedGenParticles'),
                                pvSrc = cms.InputTag('offlineSlimmedPrimaryVertices'),
                                topTagSrc = cms.InputTag('patJetsCMSTopTagCHSPacked'),
+                               topTagFilteredSrc = cms.InputTag('patJetsCMSTopTagCHSPackedFiltered'),
                                ca8JetSrc = cms.InputTag('patJetsCA8PF'),
                                topTagParams = caTopTagParams.clone(
                                     tagName = cms.string('CATop')
                                     )
                                )
 #print 'Test 4'
+##############################################################################                                                                                                                              
+#OUTPUT                                                                                                                                                                                                     
+process.out = cms.OutputModule("PoolOutputModule",
+                               fileName = cms.untracked.string("ZPrimeToTTJets_M4000GeV_W400GeV_edmNtuple_12_15_2014.root"),
+                               SelectEvents   = cms.untracked.PSet( SelectEvents = cms.vstring('p') ),
+                               outputCommands = cms.untracked.vstring('drop *',
+                                                                      'keep *_*miniAOD*_*_*',
+                                                                      'keep patJets_*TopTag*_*_*'
+                                                                      )
+                               )
+
 ##############################################################################  
 #PATHS
 
@@ -288,19 +380,7 @@ process.p = cms.Path(
    # *process.patJetsCMSTopTagCHSPacked
    # *process.miniAOD
     )
-'''
-##############################################################################  
-#OUTPUT
-process.out = cms.OutputModule("PoolOutputModule",
-                               fileName = cms.untracked.string("miniAOD_RSGluonToTT_4TeV.root"),
-                               SelectEvents   = cms.untracked.PSet( SelectEvents = cms.vstring('p') ),
-                               outputCommands = cms.untracked.vstring('drop *',
-                                                                      'keep *_*miniAOD*_*_*'
-                                                                      )  
-                               )
 
-process.outpath = cms.EndPath(process.out)
-'''
 #print 'Test 5'
 process.outpath = cms.EndPath(process.out)
 

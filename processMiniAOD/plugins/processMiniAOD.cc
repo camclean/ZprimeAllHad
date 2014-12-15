@@ -77,6 +77,7 @@ class processMiniAOD : public edm::EDFilter {
   edm::EDGetTokenT<edm::View<reco::GenParticle> > prunedGenToken_;//new method - July 31, 2014
   edm::EDGetTokenT<edm::View<reco::Vertex> > pvSrc_;
   edm::EDGetTokenT<edm::View<pat::Jet> > topTagSrc_;
+  edm::EDGetTokenT<edm::View<pat::Jet> > topTagFilteredSrc_;
   edm::EDGetTokenT<edm::View<pat::Jet> > ca8JetSrc_;
   std::string               topTagName_;
 };
@@ -98,6 +99,7 @@ processMiniAOD::processMiniAOD(const edm::ParameterSet& iConfig):
   prunedGenToken_(consumes<edm::View<reco::GenParticle> >(iConfig.getParameter<edm::InputTag>("pruned"))),
   pvSrc_(consumes<edm::View<reco::Vertex> >(iConfig.getParameter<edm::InputTag>("pvSrc"))),
   topTagSrc_(consumes<edm::View<pat::Jet> >(iConfig.getParameter<edm::InputTag>("topTagSrc"))),
+  topTagFilteredSrc_(consumes<edm::View<pat::Jet> >(iConfig.getParameter<edm::InputTag>("topTagFilteredSrc"))),
   ca8JetSrc_(consumes<edm::View<pat::Jet> >(iConfig.getParameter<edm::InputTag>("ca8JetSrc"))),
   topTagName_   (iConfig.getParameter<edm::ParameterSet>("topTagParams").getParameter<std::string>("tagName") )
 {
@@ -108,6 +110,9 @@ processMiniAOD::processMiniAOD(const edm::ParameterSet& iConfig):
   produces<std::vector<double> > ("topTagMinMass");
   produces<std::vector<double> > ("topTagBDisc");
   produces<std::vector<double> > ("topTagNSubjets");
+  produces<std::vector<double> > ("topTagFilteredMinMass");
+  produces<std::vector<double> > ("topTagFilteredBDisc");
+  produces<std::vector<double> > ("topTagFilteredNSubjets");
   produces<std::vector<double> > ("topTagSubjetBDisc");
   produces<std::vector<double> > ("tau1");
   produces<std::vector<double> > ("tau2");
@@ -118,7 +123,7 @@ processMiniAOD::processMiniAOD(const edm::ParameterSet& iConfig):
   produces<std::vector<double> > ("ak8PFJetsCHSFilteredLinks");
   produces<std::vector<double> > ("jet1SubjetBDiscEff");
   produces<std::vector<double> > ("jet2SubjetBDiscEff");
-  produces<std::vector<double> > ("ak8nDaughters");
+  produces<std::vector<double> > ("AK8jetNSubjets");
 
   produces<double> ("jet1ptEff");
   produces<double> ("jet2ptEff");
@@ -148,6 +153,7 @@ processMiniAOD::processMiniAOD(const edm::ParameterSet& iConfig):
   produces<std::vector<reco::Candidate::PolarLorentzVector> > ("AK8jetP4");
   produces<std::vector<reco::Candidate::PolarLorentzVector> > ("genTopP4");
   produces<std::vector<reco::Candidate::PolarLorentzVector> > ("topTagP4");
+  produces<std::vector<reco::Candidate::PolarLorentzVector> > ("topTagFilteredP4");
   produces<std::vector<reco::Candidate::PolarLorentzVector> > ("topTagSubjetP4");
 
   produces<std::vector<reco::Candidate::PolarLorentzVector> > ("jet1P4");
@@ -199,6 +205,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   Handle<edm::View<reco::GenParticle> > h_gen;
   Handle<edm::View<reco::Vertex> > h_pv;
   Handle<edm::View<pat::Jet> > h_topTag;
+  Handle<edm::View<pat::Jet> > h_topTagFiltered;
   Handle<edm::View<pat::Jet> > h_ca8Jet;
 
   iEvent.getByLabel( AK8jetSrc_, h_AK8jet );
@@ -206,6 +213,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.getByToken(prunedGenToken_,h_gen);
   iEvent.getByToken(pvSrc_,h_pv);
   iEvent.getByToken(topTagSrc_, h_topTag);
+  iEvent.getByToken(topTagFilteredSrc_, h_topTagFiltered);
   iEvent.getByToken(ca8JetSrc_, h_ca8Jet);
 
   //cout <<"Handles created"<<endl;
@@ -216,6 +224,9 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   std::auto_ptr<std::vector<double> > topTagMinMass ( new std::vector<double>() );
   std::auto_ptr<std::vector<double> > topTagBDisc ( new std::vector<double>() );
   std::auto_ptr<std::vector<double> > topTagNSubjets ( new std::vector<double>() );
+  std::auto_ptr<std::vector<double> > topTagFilteredMinMass ( new std::vector<double>() );
+  std::auto_ptr<std::vector<double> > topTagFilteredBDisc ( new std::vector<double>() );
+  std::auto_ptr<std::vector<double> > topTagFilteredNSubjets ( new std::vector<double>() );
   std::auto_ptr<std::vector<double> > tau1 ( new std::vector<double>() );
   std::auto_ptr<std::vector<double> > tau2 ( new std::vector<double>() );
   std::auto_ptr<std::vector<double> > tau3 ( new std::vector<double>() );
@@ -226,7 +237,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   std::auto_ptr<std::vector<double> > ak8PFJetsCHSFilteredLinks( new std::vector<double>() );
   std::auto_ptr<std::vector<double> > jet1SubjetBDiscEff( new std::vector<double>() );
   std::auto_ptr<std::vector<double> > jet2SubjetBDiscEff( new std::vector<double>() );
-  std::auto_ptr<std::vector<double> > ak8nDaughters( new std::vector<double>() );
+  std::auto_ptr<std::vector<double> > AK8jetNSubjets( new std::vector<double>() );
 
   std::auto_ptr<double> jet1ptEff ( new double() );
   std::auto_ptr<double> jet2ptEff ( new double() );
@@ -256,6 +267,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   std::auto_ptr<p4_vector> AK8jetP4( new p4_vector() );
   std::auto_ptr<p4_vector> genTopP4( new p4_vector() );
   std::auto_ptr<p4_vector> topTagP4( new p4_vector() );
+  std::auto_ptr<p4_vector> topTagFilteredP4( new p4_vector() );
   std::auto_ptr<p4_vector> topTagSubjetP4( new p4_vector() );
 
   std::auto_ptr<p4_vector> jet1P4( new p4_vector() );
@@ -373,7 +385,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
       double deltaEtaSqEff_0 = (genTop[0]->eta() - corrJet.eta())*(genTop[0]->eta() - corrJet.eta());
       double deltaReff_0 = sqrt(deltaPhiSqEff_0 + deltaEtaSqEff_0);
 
-      cout <<"deltaReff_0 = "<<deltaReff_0<<endl;
+      //cout <<"deltaReff_0 = "<<deltaReff_0<<endl;
 
       if (deltaReff_0 < 0.1){
 	jet1P4->push_back(corrJet);
@@ -450,8 +462,26 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
     }
   }
 
-   if ((*jet1tagEff != -1) && (*jet2tagEff != -1)){
-     *mtttag = (topTag1[0]->p4() + topTag2[0]->p4()).M();
+  if ((*jet1tagEff != -1) && (*jet2tagEff != -1)){
+    *mtttag = (topTag1[0]->p4() + topTag2[0]->p4()).M();
+  }
+
+  //filtered top tag for-loop
+  for ( edm::View<pat::Jet>::const_iterator jetBegin = h_topTagFiltered->begin(), jetEnd = h_topTagFiltered->end(), ijet = jetBegin; ijet != jetEnd; ++ijet ) {
+    reco::Candidate::LorentzVector uncorrJet = ijet->correctedP4(0);
+    reco::Candidate::PolarLorentzVector corrJet (uncorrJet.pt(), uncorrJet.eta(), uncorrJet.phi(), uncorrJet.mass());
+
+    double nSubjets = ijet->numberOfDaughters();
+
+    const reco::CATopJetTagInfo * catopTag = dynamic_cast<reco::CATopJetTagInfo const *>(ijet->tagInfo(topTagName_));
+
+    //double topMassEff = catopTag->properties().topMass;
+    double minMassEff = catopTag->properties().minMass;
+
+    topTagFilteredMinMass->push_back( minMassEff);
+    topTagFilteredP4->push_back( corrJet );
+    topTagFilteredBDisc->push_back( ijet->bDiscriminator("combinedSecondaryVertexBJetTags") );
+    topTagFilteredNSubjets->push_back( nSubjets );
   }
   
   //cout <<"-----------"<<endl;
@@ -460,12 +490,14 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   *AK8jet1tagEff = 0;
   *AK8jet2tagEff = 0;
 
-  //reconstructed jet four-vectors
+  //reconstructed AK8 jet four-vectors
   for ( std::vector<pat::Jet>::const_iterator jetBegin = h_AK8jet->begin(), jetEnd = h_AK8jet->end(), ijet = jetBegin; ijet != jetEnd; ++ijet ) {
     //cout<<ijet->pt()<<" GeV"<<endl;
     jetPt->push_back(ijet->pt());
     jetEta->push_back(ijet->eta());
     jetPhi->push_back(ijet->phi());
+
+    AK8jetNSubjets->push_back(ijet->numberOfDaughters());
 
     ak8PFJetsCHSPrunedLinks->push_back(ijet->userFloat("ak8PFJetsCHSPrunedLinks"));
     ak8PFJetsCHSTrimmedLinks->push_back(ijet->userFloat("ak8PFJetsCHSTrimmedLinks"));
@@ -557,7 +589,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
       }
     }
   }
-  
+
   //Nsubjettiness for-loop
   if(h_ca8Jet.isValid()){
     //cout<<"There are "<<h_ca8Jet->size()<<" CA8 jets."<<endl;
@@ -594,6 +626,9 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.put(topTagMinMass ,"topTagMinMass");
   iEvent.put(topTagBDisc   ,"topTagBDisc");
   iEvent.put(topTagNSubjets,"topTagNSubjets");
+  iEvent.put(topTagFilteredMinMass ,"topTagFilteredMinMass");
+  iEvent.put(topTagFilteredBDisc   ,"topTagFilteredBDisc");
+  iEvent.put(topTagFilteredNSubjets,"topTagFilteredNSubjets");
   iEvent.put(topTagSubjetBDisc   ,"topTagSubjetBDisc");
   iEvent.put(tau1, "tau1");
   iEvent.put(tau2, "tau2");
@@ -604,7 +639,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.put(ak8PFJetsCHSFilteredLinks,"ak8PFJetsCHSFilteredLinks");
   iEvent.put(jet1SubjetBDiscEff   ,"jet1SubjetBDiscEff");
   iEvent.put(jet2SubjetBDiscEff   ,"jet2SubjetBDiscEff");
-  iEvent.put(ak8nDaughters,"ak8nDaughters");
+  iEvent.put(AK8jetNSubjets,"AK8jetNSubjets");
 
   iEvent.put(jet1ptEff, "jet1ptEff");
   iEvent.put(jet2ptEff, "jet2ptEff");
@@ -634,6 +669,7 @@ processMiniAOD::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.put(AK8jetP4,"AK8jetP4");
   iEvent.put(genTopP4,"genTopP4");
   iEvent.put(topTagP4,"topTagP4");  
+  iEvent.put(topTagFilteredP4,"topTagFilteredP4");
   iEvent.put(topTagSubjetP4, "topTagSubjetP4");
 
   iEvent.put(jet1P4, "jet1P4");
